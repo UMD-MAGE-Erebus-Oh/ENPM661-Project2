@@ -20,16 +20,141 @@ from shapely.geometry.polygon import Polygon
 import shapely
 from shapely import affinity
 
-from typing import List
+from typing import List, Tuple, Any, Union, Set
 import math
+import copy
+from enum import Enum
+import os
+import queue
 
 CLEARANCE = 2
+WIDTH = 180
+HEIGHT = 50
 
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
 # Step 1: Define Actions in Methematical Format
-# 
+# Each state represented as the Node class
+# Each action represented as enum and function
+
+class Actions(Enum):
+    # 8-connected space
+    # .nam, .value
+    # NAME = (DX, DY)
+    UP = (0, 1)
+    DOWN = (0, -1)
+    LEFT = (-1, 0)
+    RIGHT = (1, 0)
+
+    UPLEFT = (-1, 1)
+    UPRIGHT = (1, 1)
+    DOWNLEFT = (-1, -1)
+    DOWNRIGHT = (1, -1)
+
+# Cost of each Action as a dictionary
+COST_BFS = {
+    Actions.UP: 1,
+    Actions.DOWN: 1,
+    Actions.LEFT: 1,
+    Actions.RIGHT: 1,
+    Actions.UPLEFT: 1,
+    Actions.UPRIGHT: 1,
+    Actions.DOWNLEFT: 1,
+    Actions.DOWNRIGHT: 1
+}
+
+class Node:
+
+    def __init__(self, pos: Tuple[int, int], index: int, parent: int):
+        self.pos = pos
+        self.index = index
+        self.parent = parent
+
+    def __copy__(self):
+        # shallow copy
+        return Node(pos = self.pos, index = self.index, parent = self.parent)
+    
+    def __deepcopy__(self, memo=None):
+        # deep copy
+        # ints copied by value
+        return Node(pos = (self.pos[0], self.pos[1]), index = self.index, parent = self.parent)
+    
+    def __eq__(self, other: Any):
+        # checks if robot position is the same
+        # ignore index and parent info
+        if isinstance(other, Node):
+            return self.pos == other.pos
+        else:
+            return False
+        
+    def __hash__(self):
+        # hash by robot position to use in Set
+        return hash(str(self.pos))
+    
+    def __str__(self):
+        return str(self.pos)
+    
+    def __repr__(self):
+        return f"{self.pos}, {self.index}, {self.parent}"
+    
+def in_bounds(coord: Tuple[int, int]) -> bool:
+    # just checks if coordinate is within map bounds
+    # will check if coordinate is an obstacle later
+    x, y = coord
+    x_in_bounds = x >= 0 and x < WIDTH
+    y_in_bounds = y >= 0 and y < HEIGHT
+
+    return x_in_bounds and y_in_bounds
+    
+def move(current_node: Node, dir: Actions) -> Node:
+
+    if in_bounds(dir.value):
+        dx, dy = dir.value
+        next_node = copy.deepcopy(current_node)
+        current_pos = current_node.pos
+        next_node.pos = (current_pos[0] + dx, current_pos[1] + dy)
+        next_node.parent = current_node.index
+        # will update new node index later
+        return next_node
+    else:
+        # invalid state
+        return None
+    
+def move_up(current_node: Node) -> Node:
+    return move(current_node, Actions.UP)
+
+def move_down(current_node: Node) -> Node:
+    return move(current_node, Actions.DOWN)
+
+def move_left(current_node: Node) -> Node:
+    return move(current_node, Actions.LEFT)
+
+def move_right(current_node: Node) -> Node:
+    return move(current_node, Actions.RIGHT)
+
+def move_upleft(current_node: Node) -> Node:
+    return move(current_node, Actions.UPLEFT)
+
+def move_upright(current_node: Node) -> Node:
+    return move(current_node, Actions.UPRIGHT)
+
+def move_downleft(current_node: Node) -> Node:
+    return move(current_node, Actions.DOWNLEFT)
+
+def move_downright(current_node: Node) -> Node:
+    return move(current_node, Actions.DOWNRIGHT)
+
+ALL_ACTIONS = [
+    move_up,
+    move_down,
+    move_left,
+    move_right,
+    move_upleft,
+    move_upright,
+    move_downleft,
+    move_downright
+]
 
 
 # Step 2: Find the Mathematical Representation of Free Space
@@ -203,10 +328,10 @@ class Number6(Obstacle):
             clearance = CLEARANCE
         )
 
-class Project2Map():
+class Project2Map:
 
-    height = 50
-    width = 180
+    height = HEIGHT
+    width = WIDTH
 
     map_filename = 'map.png'
 
@@ -220,12 +345,18 @@ class Project2Map():
             Number6(x_offset=26, y_offset=0),
             Number1(),
         ]
-        # draw map space into image
-        self.draw_map(show_fig=True, save = True)
+
+        if not os.path.exists(self.map_filename):
+            # draw map space into image
+            # only do on first run
+            self.draw_map(show_fig=True, save = True)
 
         # load obstacle spaceback in
         # note: (0,0) upper right
-        self._map_image = plt.imread('map.png')
+        self._map_image = plt.imread(self.map_filename)
+        
+
+        
 
     def map(self, x: int, y: int):
         # returns False if obstacle, else True
@@ -268,3 +399,152 @@ class Project2Map():
 
 # Step 3: Generate the Graph and Check for Goal Node in each Iteration
 # aka perform BFS
+
+class Project2Solver:
+
+    def __init__(self):
+        # initializes map and obstacles
+        self.map = Project2Map()
+
+        # print welcome message
+
+        # get start and goal positions from user input
+        start = self.get_input("Start")
+        goal = self.get_input("Goal")
+
+        self.start = Node(start, 0, -1)
+        self.goal = Node(goal, -1, -1)
+        # nodes to explore
+        self.open_list = queue.Queue()
+        # explored nodes (in order of exploration)
+        self.closed_list: List[Node] = []
+        # visited nodes
+        self.explored_order: List[Node] = []
+        # explored notes as set
+        # for efficient checking
+        self.closed_set: Set[Node] = set()
+        self.path: List[Node] = []
+
+        # solve with BFS
+        self.solve()
+
+        # visualize
+        # self.visualize()
+
+    def get_input(self, name: str) -> Tuple[int, int]:
+        tup = ""
+        while(isinstance(tup, str)):
+            print(f"\t{tup}")
+            tup = str(input(f"Enter {name} Position (e.g., X,Y): "))
+            tup = self.str_to_tuple(tup)
+
+            if not self.valid_coord(tup):
+                tup = f"Invalid coordinates: {tup}"
+        return tup
+
+    def valid_coord(self, n: Node | Tuple[int, int]) -> bool:
+        if isinstance(n, Node):
+            n = n.pos
+        
+        within_bounds = in_bounds(n)
+        if within_bounds:
+            return self.map.map(n[0], n[1])
+
+        return False
+
+    def str_to_tuple(self, a: str) -> Tuple[int, int] | str:
+        # returns properly parse coordinates, or string error message if input is invalid
+        a_orig = copy.copy(a)
+        # remove whitespace, and split by comma
+        a = a.replace(' ', '')
+        if a.find(',') < 0:
+            # no comma found in string
+            return f"No command found in input: {a}"
+        # separate coordinates by comma
+        a = a.split(',')
+        if len(a) > 2:
+            # more than x,y given
+            return f"Too many coordinates found in input: {a_orig}"
+        
+        for num in a:
+            if not num.isdigit():
+                return f"Non-integer found in input: {a_orig} ({num})"
+
+        # input properly formatted
+        # return as tuple x,y
+        return int(a[0]), int(a[1])   
+    
+    def solve(self) -> None:
+        # Implement BFS
+
+        # insert start in queue
+        print(self.start)
+        print(f"open list {self.open_list}")
+        self.open_list.put(self.start)
+
+        current = None
+
+        print(self.open_list)
+
+        while self.open_list.qsize() > 0:
+
+            # pop queue (FIFO)
+            current = self.open_list.get()
+            print(current)
+            # add to closed list (visited)
+            self.closed_list.append(current)
+            self.closed_set.add(current)
+            self.explored_order.append(current)
+
+            # check if goal node
+            if self.is_goal(current):
+                print(current)
+                print("solved")
+                break
+
+            # generate all possible states from current state
+            for action in ALL_ACTIONS:
+                next = action(current)
+                if (not next is None) and (not next in self.closed_set):
+                    # add to open list if not visited
+                    print(f"adding {next}")
+                    next.parent = current.index
+                    next.index = len(self.explored_order)
+                    self.open_list.put(next)
+                    self.explored_order.append(next)
+
+            # failure if open list is empty
+            if self.open_list.qsize() <= 0:
+                raise RuntimeError(f"No solution for start: {self.start} and goal: {self.goal}")
+        
+        # current is goal
+        # print(self.closed_list)
+        # exit()
+        self.path = self.generate_path(current)
+
+        print("Solution:")
+        for p in self.path:
+            print(p)
+    
+    # Step 4: Optimal Path (Backtracking)
+    # function to compaire current node with goal node
+    # function to recreate path from start to goal node
+
+    def is_goal(self, n: Node) -> bool:
+        return self.goal == n
+    
+    def generate_path(self, final: Node) -> List[Node]:
+        self.path = []
+        while final != self.start:
+            self.path.append(final)
+            final = self.closed_list[final.parent]
+        self.path.append(final)
+
+        return self.path[::-1]
+
+    # Step 5: Represent the Optimal Path
+    # optimal path animations
+    # show node exploration and optimal path
+
+    def visualize(self) -> None:
+        raise NotImplementedError
