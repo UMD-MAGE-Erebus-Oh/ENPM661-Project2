@@ -96,7 +96,7 @@ class Node:
         return str(self.pos)
     
     def __repr__(self):
-        return f"{self.pos}, {self.index}, {self.parent}"
+        return f"[pos={self.pos}, index={self.index}, parent={self.parent}]"
     
 def in_bounds(coord: Tuple[int, int]) -> bool:
     # just checks if coordinate is within map bounds
@@ -402,15 +402,17 @@ class Project2Map:
 
 class Project2Solver:
 
-    def __init__(self):
+    def __init__(self, start, goal):
         # initializes map and obstacles
         self.map = Project2Map()
 
         # print welcome message
 
         # get start and goal positions from user input
-        start = self.get_input("Start")
-        goal = self.get_input("Goal")
+        # start = self.get_input("Start")
+        # goal = self.get_input("Goal")
+        start = start
+        goal = goal
 
         self.start = Node(start, 0, -1)
         self.goal = Node(goal, -1, -1)
@@ -422,14 +424,14 @@ class Project2Solver:
         self.explored_order: List[Node] = []
         # explored notes as set
         # for efficient checking
-        self.closed_set: Set[Node] = set()
+        self.explored_set: Set[Node] = set()
         self.path: List[Node] = []
 
         # solve with BFS
         self.solve()
 
         # visualize
-        # self.visualize()
+        self.visualize()
 
     def get_input(self, name: str) -> Tuple[int, int]:
         tup = ""
@@ -491,9 +493,11 @@ class Project2Solver:
             # pop queue (FIFO)
             current = self.open_list.get()
             print(current)
+            # print(self.open_list)
+            # print(self.closed_list)
             # add to closed list (visited)
             self.closed_list.append(current)
-            self.closed_set.add(current)
+            self.explored_set.add(current)
             self.explored_order.append(current)
 
             # check if goal node
@@ -505,13 +509,17 @@ class Project2Solver:
             # generate all possible states from current state
             for action in ALL_ACTIONS:
                 next = action(current)
-                if (not next is None) and (not next in self.closed_set):
+                # check action is not into an obstacle
+                # print(next)
+                if (not next is None) and self.valid_coord(next) and (not next in self.explored_set):
+                    # breakpoint()
                     # add to open list if not visited
-                    print(f"adding {next}")
+                    # print(f"adding {next}")
                     next.parent = current.index
                     next.index = len(self.explored_order)
                     self.open_list.put(next)
                     self.explored_order.append(next)
+                    self.explored_set.add(next)
 
             # failure if open list is empty
             if self.open_list.qsize() <= 0:
@@ -537,7 +545,7 @@ class Project2Solver:
         self.path = []
         while final != self.start:
             self.path.append(final)
-            final = self.closed_list[final.parent]
+            final = self.explored_order[final.parent]
         self.path.append(final)
 
         return self.path[::-1]
@@ -547,4 +555,26 @@ class Project2Solver:
     # show node exploration and optimal path
 
     def visualize(self) -> None:
-        raise NotImplementedError
+        fig = plt.figure(figsize=(21, 6))
+        ax = fig.add_subplot(111)
+        ax.set_xlim(0, 180)
+        ax.set_ylim(0, 50)
+
+        # draw obstacles in blue
+        for o in self.map.obstacles:
+            o.draw(ax, color = 'blue')
+
+        # draw path
+        # draw start and goal
+        ax.scatter(self.start.pos[0], self.start.pos[1], marker='D', c='g', s=5.0)
+        ax.scatter(self.goal.pos[0], self.goal.pos[1], marker='x', c='r')
+        # convert path to numpy array
+        np_path = np.array([list(node.pos) for node in self.path]).T
+        ax.plot(np_path[0], np_path[1], linewidth=1, markersize=20)
+
+        ax.scatter(self.start.pos[0], self.start.pos[1], marker='D', c='g', s=5.0)
+        ax.scatter(self.goal.pos[0], self.goal.pos[1], marker='x', c='r')
+
+
+        plt.savefig("visual.png")
+        # plt.show()
