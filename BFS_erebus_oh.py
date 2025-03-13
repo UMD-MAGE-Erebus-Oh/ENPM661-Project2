@@ -417,7 +417,7 @@ class Project2Solver:
 
 
         # print welcome message
-        print("Welcome to Ere's Project 2 Solver!---------\n\n")
+        print("\nWelcome to Ere's Project 2 Solver!---------\n\n")
 
         # get start and goal positions from user input
         start = self.get_input("Start")
@@ -571,7 +571,7 @@ class Visualizer:
 
         self.save_progress = None
 
-        self.filename = 'animation.gif'
+        self.filename = 'animation'
         
 
     def _init_frame(self):
@@ -591,7 +591,7 @@ class Visualizer:
             o.draw(ax, color='blue')
 
         # Draw start (Green)
-        ax.scatter(self.solver.start.pos[0], self.solver.start.pos[1], marker='s', c='g')
+        ax.scatter(self.solver.start.pos[0], self.solver.start.pos[1], marker='s', c='#7dffa0')
         # Draw goal (Red X)
         ax.scatter(self.solver.goal.pos[0], self.solver.goal.pos[1], marker='s', c='r')
 
@@ -606,6 +606,12 @@ class Visualizer:
         cbar.set_label('Explored Order')
 
         return fig, exploration_draw, path_line, cbar
+    
+    # def _init_animation(self):
+    #     self.exploration_draw.set_offsets([], [])
+    #     self.path_line.set_data([], [])
+
+    #     return self.exploration_draw, self.path_line,
 
     def _update_animation(self, i):
         if i < self.np_closed.shape[0]:
@@ -613,6 +619,8 @@ class Visualizer:
             self.exploration_draw.set_offsets(self.np_closed[:i])
             self.exploration_draw.set_array(np.arange(i))
             self.cbar.set_ticks(np.arange(0, self.np_closed.shape[0], self.cstep))
+
+            self.path_line.set_data([],[])
 
         else:
             # draw path
@@ -625,27 +633,47 @@ class Visualizer:
     def _save_update(self, i, total):
         self.save_progress.update(1)
 
+    def _save_animation(self, ani):
+        available_writers = animation.writers.list()
+
+        writer = 'ffmpeg'
+
+        if 'ffmpeg' in available_writers:
+            self.filename += ".mp4"
+        else:
+            self.filename += ".gif"
+            writer = "pillow"
+
+        # write animation as gif to disk
+        if writer == 'pillow':
+            print("Warning: ffmpeg not found! Using pillow and saving as GIF. This is significantly slower.")
+        
+        self.save_progress = tqdm(total = self.num_frames, desc = "Saving Animation", unit='frames')
+        ani.save(
+            self.filename, 
+            writer=writer, 
+            fps=60, 
+            progress_callback=self._save_update
+        )
+        print(f"Saved animation to {self.filename}")
+
     def animate(self):
         # generate animation
         ani = FuncAnimation(
             self.fig, 
             self._update_animation, 
+            # init_func = self._init_animation,
             frames=self.num_frames, 
-            interval=10, 
+            interval=30, 
             blit=True, 
-            repeat_delay=5000
+            # repeat_delay=
         )
-        plt.show()
-        # write animation as gif to disk
-        print("Warning: Longer paths will take longer to save as a gif (due to larger search space explored).")
-        self.save_progress = tqdm(total = self.num_frames, desc = "Saving Animation", unit='frames')
-        ani.save(
-            self.filename, 
-            writer='pillow', 
-            fps=60, 
-            progress_callback=self._save_update
-        )
-        print(f"Saved animation to {self.filename}")
+
+        # print("\nClose figure to write figure as MP4/GIF to disk---------------\n")
+        # plt.show()
+
+        self._save_animation(ani)
+        
 
 
 # run

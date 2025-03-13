@@ -26,7 +26,11 @@ To run the solver, just run the `BFS_erebus_oh.py` file:
 ```bash
 python BFS_erebus_oh.py
 ```
-The exploration and path gif will be output as `animation.gif`
+The exploration and path gif will be output as `animation.mp4` if ffmpeg is available (otherwise will be saved as `animation.gif`). As submitted, set to solution for start = (5,10) and goal = (1,1).
+- ffmpeg is significantly faster than pillow, to install:
+    - Linux: `sudo apt update && sudo apt install ffmpeg`
+    - [GeeksForGeeks: How to Install FFmpeg in Linux?](https://www.geeksforgeeks.org/how-to-install-ffmpeg-in-linux/)
+
 
 ## Description
 
