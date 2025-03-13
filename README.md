@@ -6,7 +6,31 @@ ENPM 661, Spring 2025
 
 March 11, 2025
 
-Deliverables
+[Github Link](https://github.com/UMD-MAGE-Erebus-Oh/ENPM661-Project2)
+
+## Run This Code
+---
+
+### Dependenices
+Install the necessary dependencies:
+```
+pip install -r requirements.txt
+```
+Or manually install the dependencies:
+```
+pip install numpy matplotlib tqdm shapely
+```
+
+### Ren Solver
+To run the solver, just run the `BFS_erebus_oh.py` file:
+```bash
+python BFS_erebus_oh.py
+```
+The exploration and path gif will be output as `animation.gif`
+
+## Description
+
+### Deliverables
 - `README.md`
     - how to run code
     - libraries/dependencies used
@@ -18,13 +42,13 @@ Deliverables
     - recording code exploration and optimal path
     - start and goal random
 
-Assumptions
+### Assumptions
 - point robot
 - 2mm clearance
 - 8 connected (UDLR = 1.0, diagonals = 1.0 for BFS, 1.4 for dijkstra)
 - map given
 
-Steps
+### Steps
 1. Define actions
     - input: current node
     - outputs: next node
@@ -36,3 +60,19 @@ Steps
     - generate path
 5. Represent Path/Exploration
     - animation for node exploration and path
+
+### Rubric
+- Define robot actions: Define correct actions for BFS and Dijkstra's(optional) algorithm
+- Obstacle space creation: Create obstacle space using half planes and semi-algebraic models
+- check start and goal point: Check the start and goal point if they fall in obstacle space
+- Node exploration and backtracking
+    - Implement BFS. The code should have sufficient comments and documentation to explain the approach
+    - (Implement Dijkstra's algorithm- optional)
+- Visualization
+    - Show visualization video demonstrating node exploration and final path generated in form of a video or gif file
+- Submissions guidelines followed: Submit the following files
+    - README file (.md or .txt)
+    - Source Codes (.py)
+    - Animation Videos
+Runtime
+    - The algorithms are able to find a solution(if possible) for any start and goal points in less than 5 minutes

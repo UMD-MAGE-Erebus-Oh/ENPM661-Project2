@@ -8,9 +8,12 @@ y
 (0, 0) ----> x
 
 """
-
+# Third Party
 import matplotlib.pyplot as plt
 import matplotlib.image
+import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
+
 import numpy as np
 from tqdm import tqdm
 
@@ -20,12 +23,15 @@ from shapely.geometry.polygon import Polygon
 import shapely
 from shapely import affinity
 
+# Built-In
 from typing import List, Tuple, Any, Union, Set
 import math
 import copy
 from enum import Enum
 import os
 import queue
+import time
+
 
 CLEARANCE = 2
 WIDTH = 180
@@ -107,43 +113,44 @@ def in_bounds(coord: Tuple[int, int]) -> bool:
 
     return x_in_bounds and y_in_bounds
     
-def move(current_node: Node, dir: Actions) -> Node:
+def move(current_node: Node, dir: Actions, map) -> Node:
+    dx, dy = dir.value
+    next_node = copy.deepcopy(current_node)
+    current_pos = current_node.pos
+    next_node.pos = (current_pos[0] + dx, current_pos[1] + dy)
 
-    if in_bounds(dir.value):
-        dx, dy = dir.value
-        next_node = copy.deepcopy(current_node)
-        current_pos = current_node.pos
-        next_node.pos = (current_pos[0] + dx, current_pos[1] + dy)
+    if in_bounds(next_node.pos) and map.map(next_node.pos):
         next_node.parent = current_node.index
         # will update new node index later
         return next_node
     else:
         # invalid state
+        # breakpoint()
         return None
     
-def move_up(current_node: Node) -> Node:
-    return move(current_node, Actions.UP)
+def move_up(current_node: Node, map) -> Node:
+    return move(current_node, Actions.UP, map)
 
-def move_down(current_node: Node) -> Node:
-    return move(current_node, Actions.DOWN)
+def move_down(current_node: Node, map) -> Node:
+    return move(current_node, Actions.DOWN, map)
 
-def move_left(current_node: Node) -> Node:
-    return move(current_node, Actions.LEFT)
+def move_left(current_node: Node, map) -> Node:
+    return move(current_node, Actions.LEFT, map)
 
-def move_right(current_node: Node) -> Node:
-    return move(current_node, Actions.RIGHT)
+def move_right(current_node: Node, map) -> Node:
+    return move(current_node, Actions.RIGHT, map)
 
-def move_upleft(current_node: Node) -> Node:
-    return move(current_node, Actions.UPLEFT)
+def move_upleft(current_node: Node, map) -> Node:
+    return move(current_node, Actions.UPLEFT, map)
 
-def move_upright(current_node: Node) -> Node:
-    return move(current_node, Actions.UPRIGHT)
+def move_upright(current_node: Node, map) -> Node:
+    return move(current_node, Actions.UPRIGHT, map)
 
-def move_downleft(current_node: Node) -> Node:
-    return move(current_node, Actions.DOWNLEFT)
+def move_downleft(current_node: Node, map) -> Node:
+    return move(current_node, Actions.DOWNLEFT, map)
 
-def move_downright(current_node: Node) -> Node:
-    return move(current_node, Actions.DOWNRIGHT)
+def move_downright(current_node: Node, map) -> Node:
+    return move(current_node, Actions.DOWNRIGHT, map)
 
 ALL_ACTIONS = [
     move_up,
@@ -358,10 +365,12 @@ class Project2Map:
 
         
 
-    def map(self, x: int, y: int):
+    def map(self, x: int | Tuple[int,int], y: int = None):
         # returns False if obstacle, else True
         # assumes (0,0) bottom left
-        # print(f"indexing: {-(y+1) + self.height}, {x}")
+        if isinstance(x, tuple):
+            y = x[1]
+            x = x[0]
         pixel = self._map_image[-(y+1) + self.height, x][:-1].sum()
         return pixel == 0
     
@@ -402,17 +411,17 @@ class Project2Map:
 
 class Project2Solver:
 
-    def __init__(self, start, goal):
+    def __init__(self, start = None, stop = None):
         # initializes map and obstacles
         self.map = Project2Map()
 
+
         # print welcome message
+        print("Welcome to Ere's Project 2 Solver!---------\n\n")
 
         # get start and goal positions from user input
-        # start = self.get_input("Start")
-        # goal = self.get_input("Goal")
-        start = start
-        goal = goal
+        start = self.get_input("Start")
+        goal = self.get_input("Goal")
 
         self.start = Node(start, 0, -1)
         self.goal = Node(goal, -1, -1)
@@ -428,10 +437,12 @@ class Project2Solver:
         self.path: List[Node] = []
 
         # solve with BFS
+        start = time.time()
         self.solve()
+        stop = time.time()
+        self.runtime = stop - start
 
-        # visualize
-        self.visualize()
+        print(f"Runtime: {self.runtime} seconds")
 
     def get_input(self, name: str) -> Tuple[int, int]:
         tup = ""
@@ -480,59 +491,50 @@ class Project2Solver:
         # Implement BFS
 
         # insert start in queue
-        print(self.start)
-        print(f"open list {self.open_list}")
+        # print(self.start)
+        # print(f"open list {self.open_list}")
         self.open_list.put(self.start)
+        self.explored_set.add(self.start)
+        self.explored_order.append(self.start)
 
         current = None
 
-        print(self.open_list)
+        # print(self.open_list)
 
         while self.open_list.qsize() > 0:
 
             # pop queue (FIFO)
             current = self.open_list.get()
-            print(current)
-            # print(self.open_list)
-            # print(self.closed_list)
             # add to closed list (visited)
             self.closed_list.append(current)
-            self.explored_set.add(current)
-            self.explored_order.append(current)
 
             # check if goal node
             if self.is_goal(current):
-                print(current)
-                print("solved")
                 break
 
             # generate all possible states from current state
             for action in ALL_ACTIONS:
-                next = action(current)
+                next = action(current, self.map)
                 # check action is not into an obstacle
-                # print(next)
-                if (not next is None) and self.valid_coord(next) and (not next in self.explored_set):
-                    # breakpoint()
+                
+                if (not next is None) and (not next in self.explored_set):
                     # add to open list if not visited
-                    # print(f"adding {next}")
                     next.parent = current.index
                     next.index = len(self.explored_order)
                     self.open_list.put(next)
                     self.explored_order.append(next)
                     self.explored_set.add(next)
 
+
             # failure if open list is empty
             if self.open_list.qsize() <= 0:
+                print("Open list empty!")
                 raise RuntimeError(f"No solution for start: {self.start} and goal: {self.goal}")
         
         # current is goal
-        # print(self.closed_list)
-        # exit()
         self.path = self.generate_path(current)
 
-        print("Solution:")
-        for p in self.path:
-            print(p)
+        print(f"Solution Path Length: {len(self.path)}")
     
     # Step 4: Optimal Path (Backtracking)
     # function to compaire current node with goal node
@@ -550,31 +552,104 @@ class Project2Solver:
 
         return self.path[::-1]
 
-    # Step 5: Represent the Optimal Path
-    # optimal path animations
-    # show node exploration and optimal path
-
-    def visualize(self) -> None:
-        fig = plt.figure(figsize=(21, 6))
-        ax = fig.add_subplot(111)
-        ax.set_xlim(0, 180)
-        ax.set_ylim(0, 50)
-
-        # draw obstacles in blue
-        for o in self.map.obstacles:
-            o.draw(ax, color = 'blue')
-
-        # draw path
-        # draw start and goal
-        ax.scatter(self.start.pos[0], self.start.pos[1], marker='D', c='g', s=5.0)
-        ax.scatter(self.goal.pos[0], self.goal.pos[1], marker='x', c='r')
-        # convert path to numpy array
-        np_path = np.array([list(node.pos) for node in self.path]).T
-        ax.plot(np_path[0], np_path[1], linewidth=1, markersize=20)
-
-        ax.scatter(self.start.pos[0], self.start.pos[1], marker='D', c='g', s=5.0)
-        ax.scatter(self.goal.pos[0], self.goal.pos[1], marker='x', c='r')
 
 
-        plt.savefig("visual.png")
-        # plt.show()
+# Step 5: Represent the Optimal Path
+# optimal path animations
+# show node exploration and optimal path]
+
+class Visualizer:
+
+    def __init__(self, solver: Project2Solver):
+        self.solver = solver
+        self.np_closed = np.array([list(node.pos) for node in self.solver.closed_list])[1:-1]
+        self.np_path = np.array([list(node.pos) for node in self.solver.path])[1:]
+
+        self.fig, self.exploration_draw, self.path_line, self.cbar = self._init_frame()
+
+        self.num_frames = self.np_closed.shape[0] + self.np_path.shape[0]
+
+        self.save_progress = None
+
+        self.filename = 'animation.gif'
+        
+
+    def _init_frame(self):
+        # Create the figure and axes
+        fig, ax = plt.subplots(figsize=(15, 6))
+        fig.suptitle(f'Breadth-First Search from {self.solver.start.pos} to {self.solver.goal.pos}')
+        ax.set_xlim(-10, 190)
+        ax.set_ylim(-10, 60)
+
+        # Draw borders (Blue)
+        border_x = [0-1, 0-1, 180, 180, 0-1]
+        border_y = [0-1, 50, 50, 0-1, 0-1]
+        ax.plot(border_x, border_y, linewidth=2, c='b')
+
+        # Draw obstacles (Blue)
+        for o in self.solver.map.obstacles:
+            o.draw(ax, color='blue')
+
+        # Draw start (Green)
+        ax.scatter(self.solver.start.pos[0], self.solver.start.pos[1], marker='s', c='g')
+        # Draw goal (Red X)
+        ax.scatter(self.solver.goal.pos[0], self.solver.goal.pos[1], marker='s', c='r')
+
+        # Init exploration and path
+        exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
+        exploration_draw.set_clim(0, self.np_closed.shape[0])
+        path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
+
+        # Init Colorbar
+        self.cstep = int(self.np_closed.shape[0] / 10) # want 10 ticks along colorbar
+        cbar = fig.colorbar(exploration_draw, ax=ax)
+        cbar.set_label('Explored Order')
+
+        return fig, exploration_draw, path_line, cbar
+
+    def _update_animation(self, i):
+        if i < self.np_closed.shape[0]:
+            # draw exploration
+            self.exploration_draw.set_offsets(self.np_closed[:i])
+            self.exploration_draw.set_array(np.arange(i))
+            self.cbar.set_ticks(np.arange(0, self.np_closed.shape[0], self.cstep))
+
+        else:
+            # draw path
+            idx = i - self.np_closed.shape[0]
+            self.path_line.set_data(self.np_path[:idx].T)
+
+        return self.exploration_draw, self.path_line,
+        
+
+    def _save_update(self, i, total):
+        self.save_progress.update(1)
+
+    def animate(self):
+        # generate animation
+        ani = FuncAnimation(
+            self.fig, 
+            self._update_animation, 
+            frames=self.num_frames, 
+            interval=10, 
+            blit=True, 
+            repeat_delay=5000
+        )
+        plt.show()
+        # write animation as gif to disk
+        print("Warning: Longer paths will take longer to save as a gif (due to larger search space explored).")
+        self.save_progress = tqdm(total = self.num_frames, desc = "Saving Animation", unit='frames')
+        ani.save(
+            self.filename, 
+            writer='pillow', 
+            fps=60, 
+            progress_callback=self._save_update
+        )
+        print(f"Saved animation to {self.filename}")
+
+
+# run
+if __name__ == '__main__':
+    solver = Project2Solver()
+    v = Visualizer(solver)
+    v.animate()
